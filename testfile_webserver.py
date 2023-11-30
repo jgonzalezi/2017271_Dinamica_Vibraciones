@@ -4,7 +4,10 @@ from flask import Flask, request, render_template, jsonify
 import json
 
 # Matplotlib handles data visualization
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+
 
 # NumPy handles the different computations (speeds, positions, etc). It is imported as np by convention
 # Note: Numpy handles numerical and array computations, similar to matlab. Be careful when operating with scalars
@@ -31,20 +34,23 @@ def generate_plot():
     a = [float(item) for item in readings]
 
     # Filter the noise of the accelerometer reading
+    threshold = 0.8
+    a = [0 if -threshold < x < threshold else x for x in a]
     a = signal.medfilt(a)
     a = signal.wiener(a)
-    # a = signal.medfilt(a)
+    a = signal.medfilt(a)
+    a = signal.detrend(a)
 
     # Integrate twice to find the position
-    v = integrate.cumulative_trapezoid(a, initial=1)
-    y = integrate.cumulative_trapezoid(v, initial=1)
+    v = integrate.cumulative_trapezoid(a, x=times, initial=0)
+    y = integrate.cumulative_trapezoid(v, x=times, initial=0)
 
     fig, (y_plot, v_plot, a_plot) = plt.subplots(3, 1, figsize=(12.8, 9.6),
                                                 layout='constrained')  # a  figure with a 3x1 grid of Axes
-    fig.suptitle('Sensor readings')
+    fig.suptitle('Lectura del sensor')
 
-    y_plot.set_title('Y Position')
-    y_plot.set_ylabel('Position\n[mm]')
+    y_plot.set_title('Posición y')
+    y_plot.set_ylabel('Posición\n[mm]')
     y_plot.set_xlabel('Time [s]', loc='right')
     y_plot.plot(t, y)
 
@@ -54,12 +60,12 @@ def generate_plot():
     v_plot.plot(t, v)
 
     a_plot.set_title('Acceleration')
-    a_plot.set_ylabel('Acceleration\n[mm/s^2]')
+    a_plot.set_ylabel('Acceleration\n[m/s^2]')
     a_plot.set_xlabel('Time [s]', loc='right')
     a_plot.plot(t, a)
 
     # Save the plot in a static directory
-    plt.show()
+    #plt.show()
     plt.savefig('static/plot.png')
     plt.close()
 
@@ -122,7 +128,7 @@ def clear_data():
 def upload_json():
     with open('received_sensor_readings.json', 'wb') as f:
         while True:
-            chunk = request.stream.read(1024)  # Adjust chunk size as needed
+            chunk = request.stream.read(512)  # Adjust chunk size as needed
             if not chunk:
                 break
             f.write(chunk)
